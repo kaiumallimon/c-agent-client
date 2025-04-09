@@ -1,5 +1,6 @@
 import 'package:c_agent_client/app/modules/chat/controller/_chat_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:smooth_scroll_multiplatform/smooth_scroll_multiplatform.dart';
 import 'package:markdown_widget/markdown_widget.dart';
@@ -9,166 +10,71 @@ class ChatView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double screenWidth = 700;
+    final double screenWidth = MediaQuery.of(context).size.width;
 
     final theme = Theme.of(context).colorScheme;
 
     final chatController = Get.put(ChatController());
 
-    return Center(
-      child: SizedBox(
-        width: screenWidth,
-        child: Scaffold(
-          appBar: buildAppbar(theme),
-          body: SafeArea(
-              child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // chats
-                Expanded(
-                  child:
-                      DynMouseScroll(builder: (context, controller, physics) {
-                    return Obx(() {
-                      if (chatController.messages.isEmpty) {
-                        return Center(
-                          child: Text(
-                            "No messages yet",
-                            style: TextStyle(color: theme.onSurface),
-                          ),
-                        );
-                      }
-                      return ListView.builder(
-                        itemCount: chatController.messages.length,
-                        controller: controller,
-                        physics: physics,
-                        itemBuilder: (context, index) {
-                          return Row(
-                            mainAxisAlignment:
-                                chatController.messages[index].sender == "me"
-                                    ? MainAxisAlignment.end
-                                    : MainAxisAlignment.start,
-                            children: [
-                              Container(
-                                constraints: BoxConstraints(
-                                  maxWidth: screenWidth * 0.7,
-                                ),
-                                margin: EdgeInsets.only(bottom: 10),
-                                padding: const EdgeInsets.all(25),
-                                decoration: BoxDecoration(
-                                  color:
-                                      chatController.messages[index].sender ==
-                                              "me"
-                                          ? theme.primary.withOpacity(.1)
-                                          : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      chatController.messages[index].sender ==
-                                              "me"
-                                          ? CrossAxisAlignment.end
-                                          : CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    // MarkdownBody(
-                                    //   data: chatController
-                                    //       .messages[index].message,
-                                    //   styleSheet: buildMarkdownStyle(theme),
-                                    //   builders: {
-                                    //     'code': CodeElementBuilder(),
-                                    //   },
-                                    // ),
-                                    MarkdownWidget(
-                                      physics: NeverScrollableScrollPhysics(),
-                                      shrinkWrap: true,
-                                      data: chatController
-                                          .messages[index].message,
-                                    ),
-                                    const SizedBox(height: 5),
-                                    // Timestamp
-                                    Text(
-                                      chatController.messages[index].timestamp
-                                          .toString(),
-                                      style: TextStyle(
-                                        color: theme.onSurface.withOpacity(.5),
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+    return Scaffold(
+      appBar: buildAppbar(theme),
+      body: SafeArea(
+        child: Center(
+          child: SizedBox(
+            width: screenWidth > 700
+                ? 700
+                : screenWidth, // Limit width on larger screens
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // chats
+                  Expanded(
+                    child:
+                        DynMouseScroll(builder: (context, controller, physics) {
+                      return Obx(() {
+                        if (chatController.messages.isEmpty) {
+                          return Center(
+                            child: Text(
+                              "No messages yet",
+                              style: TextStyle(color: theme.onSurface),
+                            ),
                           );
-                        },
-                      );
-                    });
-                  }),
-                ),
+                        }
+                        return ListView.builder(
+                          itemCount: chatController.messages.length,
+                          controller: controller,
+                          physics: physics,
+                          itemBuilder: (context, index) {
+                            return buildMessageCard(
+                              theme,
+                              chatController.messages[index],
+                              index,
+                              screenWidth,
+                              chatController,
+                            );
+                          },
+                        );
+                      });
+                    }),
+                  ),
 
-                // text field
-                CustomExpandableTextfield(
-                  theme: theme,
-                  controller: chatController.controller,
-                  onSendPressed: chatController.sendMessage,
-                ),
-              ],
+                  // text field
+                  CustomExpandableTextfield(
+                    theme: theme,
+                    controller: chatController.controller,
+                    onSendPressed: chatController.sendMessage,
+                  ),
+                ],
+              ),
             ),
-          )),
+          ),
         ),
       ),
     );
   }
 }
-
-// class CodeElementBuilder extends MarkdownElementBuilder {
-//   @override
-//   Widget visitElementAfter(md.Element element, TextStyle? preferredStyle) {
-//     final code = element.textContent;
-//     final language = element.attributes['language'] ?? 'plaintext';
-//     return buildCodeBlock(code, language);
-//   }
-// }
-
-// Widget buildCodeBlock(String code, String? language) {
-//   return Container(
-//     decoration: BoxDecoration(
-//       color: Colors.grey[200], // Background color for code block
-//       borderRadius: BorderRadius.circular(8),
-//     ),
-//     padding: const EdgeInsets.all(8),
-//     child: SingleChildScrollView(
-//       scrollDirection: Axis.horizontal,
-//       child: HighlightView(
-//         code, // Pass the raw code, not parsed HTML
-//         language: language ?? 'plaintext',
-//         theme: githubTheme, // Use a theme from flutter_highlight
-//         padding: const EdgeInsets.all(8),
-//         textStyle: const TextStyle(
-//           fontFamily: 'monospace',
-//           fontSize: 14,
-//         ),
-//       ),
-//     ),
-//   );
-// }
-
-// MarkdownStyleSheet buildMarkdownStyle(ColorScheme theme) {
-//   return MarkdownStyleSheet(
-//     p: TextStyle(color: theme.onSurface, fontSize: 16),
-//     code: TextStyle(
-//       backgroundColor: theme.surfaceVariant.withOpacity(0.5),
-//       color: theme.onSurface,
-//       fontSize: 14,
-//     ),
-//     codeblockPadding: const EdgeInsets.all(16),
-//     codeblockDecoration: BoxDecoration(
-//       color: theme.surfaceVariant.withOpacity(0.5),
-//       borderRadius: BorderRadius.circular(8),
-//     ),
-//   );
-// }
 
 class CustomExpandableTextfield extends StatelessWidget {
   const CustomExpandableTextfield({
@@ -196,7 +102,7 @@ class CustomExpandableTextfield extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Dynamic TextField
+          // RawKeyboardListener to detect Enter key press
           ConstrainedBox(
             constraints: BoxConstraints(
               minHeight: 50,
@@ -216,6 +122,13 @@ class CustomExpandableTextfield extends StatelessWidget {
                 onChanged: (text) {
                   // Rebuild the widget to adjust the height
                 },
+                onSubmitted: (text) {
+                  // This is called when the user presses the Enter key
+                  if (text.trim().isNotEmpty) {
+                    onSendPressed();
+                  }
+                },
+                textInputAction: TextInputAction.send,
               ),
             ),
           ),
@@ -248,5 +161,92 @@ AppBar buildAppbar(ColorScheme theme) {
     toolbarHeight: 60,
     backgroundColor: theme.primary,
     foregroundColor: theme.onPrimary,
+    actions: [
+      IconButton(
+        icon: const Icon(Icons.clear),
+        onPressed: () {
+          Get.find<ChatController>().clearMessages();
+        },
+      ),
+    ],
   );
+}
+
+Widget buildMessageCard(ColorScheme theme, MessageModel message, int index,
+    double screenWidth, ChatController chatController) {
+  return Align(
+    alignment: message.sender == 'agent'
+        ? Alignment.centerLeft
+        : Alignment.centerRight,
+    child: Container(
+      constraints: BoxConstraints(
+        maxWidth:
+            screenWidth * 0.8, // Dynamically adjust width based on screen size
+      ),
+      margin: const EdgeInsets.only(left: 20, right: 20, bottom: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+      decoration: BoxDecoration(
+        color: message.sender == 'agent'
+            ? Colors.transparent
+            : theme.primary.withOpacity(.1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          MarkdownWidget(
+            physics: NeverScrollableScrollPhysics(),
+            shrinkWrap: true,
+            data: chatController.messages[index].message,
+            config: MarkdownConfig(configs: [
+              PreConfig(
+                wrapper: (child, code, language) {
+                  return Container(
+                    constraints: BoxConstraints(
+                      maxWidth: screenWidth * 0.7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.surfaceContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.all(15),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Text(
+                        code,
+                        style: TextStyle(
+                          fontFamily: 'JetBrains Mono',
+                          fontSize: 14,
+                          color: theme.onSurface,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              )
+            ]),
+          ),
+
+          const SizedBox(height: 5),
+
+          // Message time
+          Text(
+            formatTime(message.timestamp),
+            style: TextStyle(
+              color: theme.onSurface.withOpacity(.5),
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+String formatTime(DateTime time) {
+  // output: 02:05 PM, 23/10/2023
+  String formattedTime =
+      "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')} ${time.hour >= 12 ? 'PM' : 'AM'}, ${time.day.toString().padLeft(2, '0')}/${time.month.toString().padLeft(2, '0')}/${time.year}";
+  return formattedTime;
 }

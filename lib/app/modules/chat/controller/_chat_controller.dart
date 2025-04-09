@@ -4,62 +4,67 @@ import 'package:get/get.dart';
 
 class ChatController extends GetxController {
   final TextEditingController controller = TextEditingController();
+  final RxList<MessageModel> messages = <MessageModel>[].obs;
+  final RxBool isLoading = false.obs;
 
-  void showError(String title, String message) {
-    Get.snackbar(title, message,
-        backgroundColor: Get.theme.colorScheme.error,
-        colorText: Get.theme.colorScheme.onError,
-        snackPosition: SnackPosition.TOP,
-        duration: const Duration(seconds: 2),
-        margin: const EdgeInsets.all(10),
-        maxWidth: 700);
-  }
+  final ChatService chatService = ChatService();
 
-  List<MessageModel> messages = <MessageModel>[].obs;
-
-  RxBool isLoading = false.obs;
-
-  void sendMessage() async {
-    if (controller.text.isEmpty) {
-      showError("Error", "Message cannot be empty");
+  void sendMessage() {
+    final input = controller.text.trim();
+    if (input.isEmpty) {
+      Get.snackbar("Error", "Message cannot be empty");
       return;
     }
+
+    // Add user message
+    final userMessage = MessageModel(
+      message: input,
+      sender: "me",
+      timestamp: DateTime.now(),
+    );
+    messages.add(userMessage);
+
+    // Prepare streamed assistant message
+    final streamedMessage = MessageModel(
+      message: "",
+      sender: "agent",
+      timestamp: DateTime.now(),
+    );
+    messages.add(streamedMessage);
+
+    controller.clear();
     isLoading.value = true;
-    try {
-      ChatService chatService = ChatService();
 
-      MessageModel message = MessageModel(
-        message: controller.text,
-        sender: "me",
-        timestamp: DateTime.now(),
-      );
+    // Start streaming response
+    chatService.getResponseStream(input).listen(
+      (chunk) {
+        streamedMessage.message += chunk;
+        messages.refresh(); // notify UI
+      },
+      onDone: () {
+        isLoading.value = false;
+      },
+      onError: (error) {
+        isLoading.value = false;
+        Get.snackbar("Error", error.toString());
+        messages.remove(streamedMessage); // remove incomplete agent msg
+      },
+    );
+  }
 
-      final loadingMessage = MessageModel(
-        message: "Loading...",
-        sender: "agent",
-        timestamp: DateTime.now(),
-      );
+  @override
+  void onClose() {
+    controller.dispose();
+    super.onClose();
+  }
 
-      messages.add(message);
-      messages.add(loadingMessage);
-
-      controller.clear();
-
-      MessageModel response = await chatService.getResponse(message.message);
-      // Remove the loading message
-      messages.removeWhere((msg) => msg.message == "Loading...");
-      messages.add(response);
-      print(messages);
-    } catch (e) {
-      showError("Error", e.toString());
-    } finally {
-      isLoading.value = false;
-    }
+  void clearMessages() {
+    messages.clear();
   }
 }
 
 class MessageModel {
-  final String message;
+  String message; // <- removed 'final'
   final String sender;
   final DateTime timestamp;
 
